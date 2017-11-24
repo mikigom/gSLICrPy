@@ -40,3 +40,4 @@ python3 example.py
 ![original](https://github.com/mikigom/SLICrPy/blob/master/example.jpg?raw=true)
 ![segmented](https://github.com/mikigom/SLICrPy/blob/master/seg_example_results.jpg?raw=true)
 
+When n_iters=50, above example (2880 x 1800) is processed in 220ms on 1080Ti.
