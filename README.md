@@ -35,7 +35,7 @@ make
 python3 example.py
 ```
 
-### Exampe
+### Example
 
 ![original](https://github.com/mikigom/SLICrPy/blob/master/example.jpg?raw=true)
 ![segmented](https://github.com/mikigom/SLICrPy/blob/master/seg_example_results.jpg?raw=true)
