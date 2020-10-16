@@ -36,7 +36,7 @@ python3 example.py
 ```
 
 ### A note for Windows users
-When building, run instead of running make, run `cmake --build . --config Release`.
+When building, instead of running `make`, run `cmake --build . --config Release`.
 Before running the python script example.py, you need to change the line where the funciton `__get_CUDA_gSLICr__` is
 called to `__CUDA_gSLICr__ = __get_CUDA_gSLICr__("./build/Release/DEMO.dll")`. 
 
