@@ -42,16 +42,14 @@ SOURCE_GROUP(engines FILES ${GSLICR_LIB})
 
 cuda_add_library(gSLICr_lib
 			${GSLICR_LIB}
-			NVTimer.h
-			OPTIONS -gencode arch=compute_30,code=compute_30)
+			NVTimer.h)
 target_link_libraries(gSLICr_lib ${CUDA_LIBRARY})
 
 cuda_add_library(DEMO SHARED
 			demo.cpp
 			${GSLICR_LIB}
-			NVTimer.h
-			OPTIONS -gencode arch=compute_30,code=compute_30)
+			NVTimer.h)
 target_link_libraries(DEMO ${OpenCV_LIBS})
 
-add_executable(demo demo.cpp)
-target_link_libraries(demo gSLICr_lib ${OpenCV_LIBS})
+add_executable(demo_executable demo.cpp)
+target_link_libraries(demo_executable gSLICr_lib ${OpenCV_LIBS})

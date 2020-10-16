@@ -13,6 +13,15 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
+#if defined _WIN32 || defined __CYGWIN__
+	#define DLLEXPORT __declspec(dllexport)
+	#define DLLIMPORT __declspec(dllimport)
+#else
+	#define DLLEXPORT
+	#define DLLIMPORT
+#endif
+
+
 #define color_space_XYZ 0
 #define color_space_LAB 1
 #define color_space_RGB 2
@@ -21,6 +30,7 @@ using namespace std;
 using namespace cv;
 
 extern "C"
+DLLEXPORT
 void load_image_from_Mat_to_UChar4(const Mat& inimg, gSLICr::UChar4Image* outimg)
 {
 	gSLICr::Vector4u* outimg_ptr = outimg->GetData(MEMORYDEVICE_CPU);
@@ -36,6 +46,7 @@ void load_image_from_Mat_to_UChar4(const Mat& inimg, gSLICr::UChar4Image* outimg
 }
 
 extern "C"
+DLLEXPORT
 void load_image_from_UChar4_to_Mat(const gSLICr::UChar4Image* inimg, Mat& outimg)
 {
 	const gSLICr::Vector4u* inimg_ptr = inimg->GetData(MEMORYDEVICE_CPU);
@@ -51,6 +62,7 @@ void load_image_from_UChar4_to_Mat(const gSLICr::UChar4Image* inimg, Mat& outimg
 }
 
 extern "C"
+DLLEXPORT
 void CUDA_gSLICr(unsigned char* image,
                  int img_size_x,
                  int img_size_y,
