@@ -35,6 +35,47 @@ make
 python3 example.py
 ```
 
+### Docker
+
+A `Dockerfile` is provided so you can build and run without installing CUDA,
+OpenCV, or Python deps on the host. The image is based on
+`nvidia/cuda:11.8.0-devel-ubuntu22.04` and installs everything the demo needs
+(`numpy`, `scikit-image`, `opencv-python-headless`).
+
+Running requires the host to have an NVIDIA GPU plus the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+(so `--gpus all` works).
+
+Build:
+
+```
+docker build -t gslicrpy .
+```
+
+CUDA 11+ no longer supports `compute_30` (Kepler), so the Dockerfile rewrites
+the arch in `CMakeLists.txt` to `compute_75` (Turing) by default. PTX is
+forward-compatible, so the resulting binary still runs on Ampere/Ada/Hopper.
+For best perf on a specific arch, override:
+
+```
+docker build --build-arg CUDA_ARCH=compute_86 -t gslicrpy .   # RTX 30xx (Ampere)
+docker build --build-arg CUDA_ARCH=compute_89 -t gslicrpy .   # RTX 40xx (Ada)
+docker build --build-arg CUDA_ARCH=compute_90 -t gslicrpy .   # H100 (Hopper)
+```
+
+Run the bundled example:
+
+```
+docker run --rm --gpus all gslicrpy
+```
+
+Mount your own working directory to consume your images and persist the label
+map / segmented outputs back to the host:
+
+```
+docker run --rm --gpus all -v "$PWD":/work -w /work gslicrpy python3 example.py
+```
+
 ### Example
 
 ![original](https://github.com/mikigom/SLICrPy/blob/master/example.jpg?raw=true)
