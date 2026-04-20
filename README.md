@@ -42,6 +42,32 @@ python3 example.py
 
 When n_iters=50, above example (2880 x 1800) is processed in 220ms on 1080Ti.
 
+### Retrieving superpixels as contours
+
+`CUDA_gSLICr` writes its result to disk. To work with each superpixel
+individually (resolves [#1](https://github.com/mikigom/gSLICrPy/issues/1)),
+use `CUDA_gSLICr_segment`, which returns the per-pixel label map as a NumPy
+`int32` array of shape `(H, W)`:
+
+```python
+from gSLICrPy import CUDA_gSLICr_segment, __get_CUDA_gSLICr_segment__, labels_to_contours
+
+labels = CUDA_gSLICr_segment(__get_CUDA_gSLICr_segment__(),
+                             image_bgr_flat,
+                             img_size_x=W, img_size_y=H,
+                             n_segs=10, spixel_size=20,
+                             coh_weight=0.6, n_iters=50,
+                             segment_color_space=2,
+                             segment_by_size=True,
+                             enforce_connectivity=True)
+
+# {label_id: [cv2 contour, ...]} — one entry per superpixel
+contours_by_label = labels_to_contours(labels)
+```
+
+`labels_to_contours` requires `opencv-python`. If you only need binary masks
+you can skip it and just do `mask = (labels == sp_id)`.
+
 
 ### Wrapper Writer
 
