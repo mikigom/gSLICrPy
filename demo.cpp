@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdexcept>
+#include <cstring>
 
 #include "gSLICr_Lib/gSLICr.h"
 #include "NVTimer.h"
@@ -50,6 +51,42 @@ void load_image_from_UChar4_to_Mat(const gSLICr::UChar4Image* inimg, Mat& outimg
 		}
 }
 
+static gSLICr::engines::core_engine* build_engine(int img_size_x,
+                                                  int img_size_y,
+                                                  int n_segs,
+                                                  int spixel_size,
+                                                  float coh_weight,
+                                                  int n_iters,
+                                                  int segment_color_space,
+                                                  bool segment_by_size,
+                                                  bool enforce_connectivity){
+	gSLICr::objects::settings my_settings;
+	my_settings.img_size.x = img_size_x;
+	my_settings.img_size.y = img_size_y;
+	my_settings.no_segs = n_segs;
+	my_settings.spixel_size = spixel_size;
+	my_settings.coh_weight = coh_weight;
+	my_settings.no_iters = n_iters;
+
+	if(segment_color_space == color_space_XYZ)
+		my_settings.color_space = gSLICr::XYZ;
+	else if(segment_color_space == color_space_LAB)
+		my_settings.color_space = gSLICr::CIELAB;
+	else if(segment_color_space == color_space_RGB)
+		my_settings.color_space = gSLICr::RGB;
+	else
+		throw std::invalid_argument("Assigned color space is not valid");
+
+	if(segment_by_size)
+		my_settings.seg_method = gSLICr::GIVEN_SIZE;
+	else
+		my_settings.seg_method = gSLICr::GIVEN_NUM;
+
+	my_settings.do_enforce_connectivity = enforce_connectivity;
+
+	return new gSLICr::engines::core_engine(my_settings);
+}
+
 extern "C"
 void CUDA_gSLICr(unsigned char* image,
                  int img_size_x,
@@ -63,45 +100,18 @@ void CUDA_gSLICr(unsigned char* image,
                  bool segment_by_size,
                  bool enforce_connectivity,
                  const char* out_name){
-	// gSLICr settings
-	gSLICr::objects::settings my_settings;
-	my_settings.img_size.x = img_size_x;
-	my_settings.img_size.y = img_size_y;
-	my_settings.no_segs = n_segs;
-	my_settings.spixel_size = spixel_size;
-	my_settings.coh_weight = coh_weight;
-	my_settings.no_iters = n_iters;
+	gSLICr::engines::core_engine* gSLICr_engine = build_engine(
+		img_size_x, img_size_y, n_segs, spixel_size, coh_weight, n_iters,
+		segment_color_space, segment_by_size, enforce_connectivity);
 
-	if(segment_color_space == color_space_XYZ)
-		my_settings.color_space = gSLICr::XYZ; // gSLICr::CIELAB for Lab, or gSLICr::RGB for RGB
-	else if(segment_color_space == color_space_LAB)
-		my_settings.color_space = gSLICr::CIELAB;
-	else if(segment_color_space == color_space_RGB)
-		my_settings.color_space = gSLICr::RGB;
-	else
-		throw std::invalid_argument("Assigned color space is not valid");
-
-	if(segment_by_size)
-		my_settings.seg_method = gSLICr::GIVEN_SIZE; // or gSLICr::GIVEN_NUM for given number
-	else
-		my_settings.seg_method = gSLICr::GIVEN_NUM;
-	
-	my_settings.do_enforce_connectivity = enforce_connectivity; // whether or not run the enforce connectivity step
-
-	// instantiate a core_engine
-	gSLICr::engines::core_engine* gSLICr_engine = new gSLICr::engines::core_engine(my_settings);
-
-	// gSLICr takes gSLICr::UChar4Image as input and out put
-	gSLICr::UChar4Image* in_img = new gSLICr::UChar4Image(my_settings.img_size, true, true);
-	gSLICr::UChar4Image* out_img = new gSLICr::UChar4Image(my_settings.img_size, true, true);
-
-	Size s(my_settings.img_size.x, my_settings.img_size.y);
+	Size s(img_size_x, img_size_y);
+	gSLICr::UChar4Image* in_img = new gSLICr::UChar4Image(gSLICr::Vector2i(img_size_x, img_size_y), true, true);
+	gSLICr::UChar4Image* out_img = new gSLICr::UChar4Image(gSLICr::Vector2i(img_size_x, img_size_y), true, true);
 	Mat boundry_draw_frame; boundry_draw_frame.create(s, CV_8UC3);
 
     StopWatchInterface *my_timer; sdkCreateTimer(&my_timer);
 
 	Mat frame(s, CV_8UC3, (void *) image);
-
 	load_image_from_Mat_to_UChar4(frame, in_img);
 
 	sdkResetTimer(&my_timer); sdkStartTimer(&my_timer);
@@ -117,6 +127,46 @@ void CUDA_gSLICr(unsigned char* image,
 	imwrite(__out_name__, boundry_draw_frame);
 	sprintf(__out_name__, "seg_%s.pgm", out_name);
 	gSLICr_engine->Write_Seg_Res_To_PGM(__out_name__);
+
+	delete in_img;
+	delete out_img;
+	delete gSLICr_engine;
+}
+
+// Run segmentation and write the per-pixel superpixel label map into the
+// caller-provided int32 buffer of length img_size_x * img_size_y.
+// No files are produced; the caller can convert the label map into contours
+// (e.g. with cv2.findContours) for further per-superpixel processing.
+extern "C"
+void CUDA_gSLICr_segment(unsigned char* image,
+                         int img_size_x,
+                         int img_size_y,
+                         int n_segs,
+                         int spixel_size,
+                         float coh_weight,
+                         int n_iters,
+                         int segment_color_space,
+                         bool segment_by_size,
+                         bool enforce_connectivity,
+                         int* out_labels){
+	gSLICr::engines::core_engine* gSLICr_engine = build_engine(
+		img_size_x, img_size_y, n_segs, spixel_size, coh_weight, n_iters,
+		segment_color_space, segment_by_size, enforce_connectivity);
+
+	Size s(img_size_x, img_size_y);
+	gSLICr::UChar4Image* in_img = new gSLICr::UChar4Image(gSLICr::Vector2i(img_size_x, img_size_y), true, true);
+
+	Mat frame(s, CV_8UC3, (void *) image);
+	load_image_from_Mat_to_UChar4(frame, in_img);
+
+	gSLICr_engine->Process_Frame(in_img);
+
+	const gSLICr::IntImage* idx_img = gSLICr_engine->Get_Seg_Res();
+	const int* labels = idx_img->GetData(MEMORYDEVICE_CPU);
+	std::memcpy(out_labels, labels, sizeof(int) * img_size_x * img_size_y);
+
+	delete in_img;
+	delete gSLICr_engine;
 }
 
 int main(){
